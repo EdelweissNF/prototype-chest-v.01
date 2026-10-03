@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessCoach — Personal Chess Analysis & Coaching</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0f0f1a;--bg2:#1a1a2e;--bg3:#16213e;--bg4:#1e2a4a;--bg5:#243352;
+--accent:#e94560;--accent2:#533483;--accent3:#0f3460;
+--text:#eaeaea;--text2:#9ca3af;--text3:#6b7280;
+--green:#22c55e;--lgreen:#84cc16;--blue:#3b82f6;--orange:#f59e0b;
+--red:#ef4444;--purple:#a855f7;--cyan:#06b6d4;
+--board-light:#ecd5ac;--board-dark:#b08968;
+--hl-from:rgba(255,235,59,0.45);--hl-to:rgba(255,235,59,0.55);
+--hl-selected:rgba(34,197,94,0.4);--hl-legal:rgba(34,197,94,0.35);
+--hl-critical:rgba(233,69,96,0.4);
+--radius:8px;--radius-lg:12px;
+--shadow:0 4px 20px rgba(0,0,0,0.3);
+}
+html{font-size:14px}
+body{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+
+/* HEADER */
+header{background:linear-gradient(135deg,var(--bg2),var(--bg3));padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:50}
+.logo{font-size:1.3em;font-weight:800;display:flex;align-items:center;gap:8px;letter-spacing:-0.5px}
+.logo span{color:var(--accent)}
+.logo small{font-size:0.55em;color:var(--text2);font-weight:400;letter-spacing:0}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap}
+.header-actions button{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.1);padding:7px 14px;border-radius:var(--radius);font-size:0.82em;transition:all 0.2s;display:flex;align-items:center;gap:5px}
+.header-actions button:hover{background:var(--accent);border-color:var(--accent);transform:translateY(-1px)}
+
+/* NAV */
+nav{background:var(--bg2);display:flex;border-bottom:1px solid rgba(255,255,255,0.06);overflow-x:auto;position:sticky;top:50px;z-index:49}
+nav button{background:none;color:var(--text2);border:none;padding:11px 20px;font-size:0.85em;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+nav button:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+
+/* MAIN */
+main{display:flex;flex-direction:column;height:calc(100vh - 100px)}
+.tab-content{display:none;flex:1;overflow:auto}
+.tab-content.active{display:flex;flex-direction:column}
+
+/* ANALYSIS LAYOUT */
+.analysis-layout{display:flex;flex:1;overflow:hidden}
+.board-area{display:flex;flex-direction:column;align-items:center;padding:12px;min-width:300px;gap:10px}
+.board-wrapper{display:flex;gap:6px;align-items:stretch}
+
+/* EVAL BAR */
+.eval-bar-container{width:22px;background:#222;border-radius:4px;overflow:hidden;position:relative;height:min(460px,calc(100vw - 380px));max-height:460px;min-height:260px;border:1px solid rgba(255,255,255,0.1)}
+.eval-bar-white{position:absolute;bottom:0;width:100%;background:linear-gradient(to top,#f0f0f0,#ccc);transition:height 0.6s cubic-bezier(0.4,0,0.2,1)}
+.eval-bar-label{position:absolute;width:100%;text-align:center;font-size:8px;font-weight:700;z-index:2;top:50%;transform:translateY(-50%);transition:color 0.3s;padding:0 1px;word-break:break-all}
+
+/* CHESSBOARD */
+.chessboard{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:2px solid rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;width:min(460px,calc(100vw - 70px));height:min(460px,calc(100vw - 70px));max-width:460px;max-height:460px;min-width:260px;min-height:260px;user-select:none;box-shadow:var(--shadow)}
+.square{display:flex;align-items:center;justify-content:center;font-size:min(3em,calc((100vw - 70px)/11));cursor:pointer;position:relative;transition:background 0.15s}
+.square.light{background:var(--board-light)}
+.square.dark{background:var(--board-dark)}
+.square.selected{background:var(--hl-selected)!important}
+.square.legal-move::after{content:'';position:absolute;width:28%;height:28%;background:var(--hl-legal);border-radius:50%;pointer-events:none}
+.square.legal-capture::after{content:'';position:absolute;width:88%;height:88%;border:5px solid var(--hl-legal);border-radius:50%;background:transparent;pointer-events:none}
+.square.last-from{background:var(--hl-from)!important}
+.square.last-to{background:var(--hl-to)!important}
+.square.critical-highlight{box-shadow:inset 0 0 0 3px var(--accent)}
+.square .piece{z-index:1;line-height:1;filter:drop-shadow(1px 1px 2px rgba(0,0,0,0.35));transition:transform 0.12s}
+.square:hover .piece{transform:scale(1.08)}
+.square .coord{position:absolute;font-size:8px;font-weight:700;opacity:0.7;pointer-events:none}
+.square .coord-file{bottom:1px;right:2px}
+.square .coord-rank{top:1px;left:2px}
+.square.light .coord{color:var(--board-dark)}
+.square.dark .coord{color:var(--board-light)}
+
+/* BOARD CONTROLS */
+.board-controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center}
+.board-controls button{background:var(--bg4);color:var(--text);border:1px solid rgba(255,255,255,0.1);width:38px;height:34px;border-radius:6px;font-size:0.95em;transition:all 0.2s;display:flex;align-items:center;justify-content:center}
+.board-controls button:hover{background:var(--accent);border-color:var(--accent)}
+.board-controls button:active{transform:scale(0.95)}
+.board-controls select{background:var(--bg4);color:var(--text);border:1px solid rgba(255,255,255,0.1);padding:6px 8px;border-radius:6px;font-size:0.8em}
+
+/* SIDE PANEL */
+.side-panel{flex:1;min-width:280px;max-width:480px;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,0.06);overflow:hidden;background:var(--bg2)}
+.panel-tabs{display:flex;background:var(--bg3);border-bottom:1px solid rgba(255,255,255,0.06)}
+.panel-tabs button{flex:1;background:none;color:var(--text2);border:none;padding:9px 6px;font-size:0.78em;border-bottom:2px solid transparent;transition:all 0.2s}
+.panel-tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+.panel-content{flex:1;overflow-y:auto;padding:14px}
+
+/* MOVE LIST */
+.move-list-container{background:var(--bg2);border-top:1px solid rgba(255,255,255,0.06);padding:6px 14px;max-height:100px;overflow-y:auto}
+.move-list{display:flex;flex-wrap:wrap;gap:1px;font-family:'JetBrains Mono','Courier New',monospace;font-size:0.82em}
+.move-list .move-num{color:var(--text3);margin-right:1px;min-width:24px}
+.move-list .mv{padding:2px 5px;border-radius:3px;cursor:pointer;transition:all 0.12s;border-bottom:2px solid transparent}
+.move-list .mv:hover{background:rgba(255,255,255,0.08)}
+.move-list .mv.current{background:var(--accent);color:#fff}
+.move-list .mv.excellent{border-bottom-color:var(--green)}
+.move-list .mv.good{border-bottom-color:var(--lgreen)}
+.move-list .mv.inaccuracy{border-bottom-color:var(--blue)}
+.move-list .mv.mistake{border-bottom-color:var(--orange)}
+.move-list .mv.blunder{border-bottom-color:var(--red)}
+.move-list .mv.gamechanging{border-bottom-color:var(--purple)}
+
+/* GAME INFO BAR */
+.game-info-bar{display:flex;gap:10px;padding:6px 14px;background:var(--bg3);font-size:0.78em;color:var(--text2);flex-wrap:wrap;align-items:center;border-bottom:1px solid rgba(255,255,255,0.04)}
+.game-info-bar .gi{display:flex;align-items:center;gap:3px}
+.engine-status{display:flex;align-items:center;gap:4px;font-size:0.72em;padding:3px 8px;border-radius:4px;margin-left:auto}
+.engine-status.online{background:rgba(34,197,94,0.12);color:var(--green)}
+.engine-status.offline{background:rgba(245,158,11,0.12);color:var(--orange)}
+.engine-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* ANALYSIS PANEL COMPONENTS */
+.eval-display{display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg4);border-radius:var(--radius);margin-bottom:10px}
+.eval-number{font-size:1.6em;font-weight:800;font-family:'JetBrains Mono',monospace}
+.eval-bar-mini{flex:1;height:6px;background:#333;border-radius:3px;overflow:hidden}
+.eval-bar-mini-fill{height:100%;transition:width 0.5s,background 0.5s;border-radius:3px}
+
+.move-class{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius);margin-bottom:10px;font-weight:600;font-size:0.9em}
+.move-class.excellent{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);color:var(--green)}
+.move-class.good{background:rgba(132,204,22,0.1);border:1px solid rgba(132,204,22,0.25);color:var(--lgreen)}
+.move-class.inaccuracy{background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:var(--blue)}
+.move-class.mistake{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);color:var(--orange)}
+.move-class.blunder{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:var(--red)}
+.move-class.gamechanging{background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);color:var(--purple)}
+.move-class.opponent{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--text2)}
+
+.info-box{background:var(--bg4);border-radius:var(--radius);padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2);line-height:1.6;font-size:0.88em}
+.info-box .label{font-size:0.7em;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);margin-bottom:3px;font-weight:600}
+.info-box.warn{border-left-color:var(--orange)}
+.info-box.good{border-left-color:var(--green)}
+.info-box.info{border-left-color:var(--blue)}
+
+.better-move{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.better-move h4{color:var(--green);font-size:0.82em;margin-bottom:5px}
+.lesson-box{background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.lesson-box h4{color:var(--blue);font-size:0.82em;margin-bottom:5px}
+
+.decision-box{background:var(--bg4);border-radius:var(--radius);padding:12px;margin-bottom:10px;border-left:3px solid var(--orange)}
+.decision-box h4{color:var(--orange);font-size:0.82em;margin-bottom:8px}
+.decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.decision-item{background:rgba(255,255,255,0.02);padding:7px;border-radius:6px}
+.decision-item .dlabel{font-size:0.68em;text-transform:uppercase;color:var(--text3);margin-bottom:2px;font-weight:600}
+.decision-item .dvalue{font-size:0.82em;line-height:1.4}
+
+/* CRITICAL TIMELINE */
+.timeline{display:flex;flex-direction:column;gap:5px}
+.tl-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg4);border-radius:6px;cursor:pointer;transition:all 0.2s;font-size:0.82em}
+.tl-item:hover{background:rgba(233,69,96,0.08);transform:translateX(3px)}
+.tl-badge{padding:2px 7px;border-radius:4px;font-size:0.78em;font-weight:700;min-width:46px;text-align:center;color:#fff}
+.tl-desc{flex:1}
+.tl-eval{font-size:0.75em;color:var(--text3);font-family:monospace}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-lg);width:100%;max-width:720px;max-height:90vh;overflow-y:auto;padding:22px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modal h2{margin-bottom:14px;font-size:1.2em;display:flex;align-items:center;gap:8px}
+.modal .close-btn{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text2);font-size:1.4em;transition:color 0.2s}
+.modal .close-btn:hover{color:var(--accent)}
+
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:0.82em;color:var(--text2);margin-bottom:5px;font-weight:500}
+.form-group textarea,.form-group input,.form-group select{width:100%;background:var(--bg4);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius);padding:9px 12px;font-size:0.88em}
+.form-group textarea{min-height:110px;resize:vertical;font-family:'JetBrains Mono',monospace;font-size:0.82em}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--accent)}
+
+.btn{padding:9px 18px;border-radius:var(--radius);border:none;font-size:0.88em;font-weight:600;transition:all 0.2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#d63851;transform:translateY(-1px)}
+.btn-secondary{background:var(--bg4);color:var(--text);border:1px solid rgba(255,255,255,0.1)}
+.btn-secondary:hover{background:var(--bg5)}
+.btn-group{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+
+/* REPORT */
+.report-section{margin-bottom:16px}
+.report-section h3{color:var(--accent);font-size:0.95em;margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.report-item{padding:8px 10px;background:var(--bg4);border-radius:6px;margin-bottom:5px;font-size:0.85em;line-height:1.5}
+.report-item.critical{border-left:3px solid var(--accent)}
+.report-item.strength{border-left:3px solid var(--green)}
+.report-item.weakness{border-left:3px solid var(--orange)}
+.report-item.training{border-left:3px solid var(--blue)}
+
+/* PROFILE */
+.profile-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:16px}
+.stat-card{background:var(--bg4);border-radius:var(--radius);padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.05)}
+.stat-card .sv{font-size:1.6em;font-weight:800}
+.stat-card .sl{font-size:0.72em;color:var(--text2);margin-top:3px}
+.skill-bar{margin-bottom:8px}
+.skill-bar .sk-name{display:flex;justify-content:space-between;font-size:0.78em;margin-bottom:3px}
+.skill-bar .sk-bar{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.skill-bar .sk-fill{height:100%;border-radius:3px;transition:width 0.6s}
+
+/* PATTERNS & TRAINING */
+.pattern-item{display:flex;align-items:center;gap:8px;padding:9px;background:var(--bg4);border-radius:6px;margin-bottom:5px;font-size:0.85em}
+.pattern-item .pi-icon{font-size:1.1em}
+.pattern-item .pi-info{flex:1}
+.pattern-item .pi-title{font-weight:600;font-size:0.85em}
+.pattern-item .pi-desc{font-size:0.75em;color:var(--text2)}
+.training-card{background:var(--bg4);border-radius:var(--radius);padding:14px;margin-bottom:8px;border-left:3px solid var(--cyan)}
+.training-card h4{font-size:0.88em;margin-bottom:5px;color:var(--cyan)}
+.training-card p{font-size:0.82em;color:var(--text2);line-height:1.5}
+
+/* EMPTY STATE */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;text-align:center;color:var(--text2)}
+.empty-state .es-icon{font-size:2.5em;margin-bottom:10px;opacity:0.4}
+.empty-state p{font-size:0.85em;max-width:280px;line-height:1.5}
+
+/* LOADING */
+.loading-bar{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden;margin:8px 0}
+.loading-bar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent));border-radius:2px;transition:width 0.3s;animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{opacity:0.7}50%{opacity:1}100%{opacity:0.7}}
+
+/* SELF EVAL */
+.self-eval-board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:2px solid rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;width:280px;height:280px;margin:12px auto}
+.self-eval-board .se-sq{display:flex;align-items:center;justify-content:center;font-size:1.6em;cursor:pointer;transition:background 0.1s}
+.self-eval-board .se-sq.light{background:var(--board-light)}
+.self-eval-board .se-sq.dark{background:var(--board-dark)}
+.self-eval-board .se-sq:hover{filter:brightness(1.1)}
+.self-eval-board .se-sq.se-selected{background:var(--hl-selected)!important}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+.analysis-layout{flex-direction:column}
+.side-panel{max-width:none;border-left:none;border-top:1px solid rgba(255,255,255,0.06)}
+.chessboard{width:min(340px,calc(100vw - 32px));height:min(340px,calc(100vw - 32px))}
+.eval-bar-container{height:min(340px,calc(100vw - 32px))}
+header{padding:8px 12px}
+.logo{font-size:1.1em}
+.decision-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+.board-controls button{width:34px;height:30px;font-size:0.85em}
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+</style>
+</head>
+<body>
+
+<header>
+<div class="logo">♟ <span>ChessCoach</span> <small>Personal Analysis & Coaching</small></div>
+<div class="header-actions">
+<button onclick="CC.showImport()">📥 Import</button>
+<button onclick="CC.showReport()">📊 Laporan</button>
+<button onclick="CC.startSelfEval()">🧠 Self-Eval</button>
+<button onclick="CC.resetAll()">🗑️ Reset</button>
+</div>
+</header>
+
+<nav>
+<button class="active" data-tab="analysis" onclick="CC.switchTab('analysis')">♟ Analisis</button>
+<button data-tab="profile" onclick="CC.switchTab('profile')">👤 Profil</button>
+<button data-tab="training" onclick="CC.switchTab('training')">🎯 Latihan</button>
+<button data-tab="mistakes" onclick="CC.switchTab('mistakes')">📚 Mistakes</button>
+</nav>
+
+<main>
+<!-- ANALYSIS TAB -->
+<div id="tab-analysis" class="tab-content active">
+<div class="game-info-bar" id="gi-bar" style="display:none">
+<div class="gi" id="gi-players"></div>
+<div class="gi" id="gi-result"></div>
+<div class="gi" id="gi-opening"></div>
+<div class="gi" id="gi-moves"></div>
+<div class="engine-status offline" id="engine-status"><div class="dot"></div><span>Initializing...</span></div>
+</div>
+<div class="analysis-layout">
+<div class="board-area">
+<div class="board-wrapper">
+<div class="eval-bar-container">
+<div class="eval-bar-white" id="eval-bar"></div>
+<div class="eval-bar-label" id="eval-bar-label">0.0</div>
+</div>
+<div id="board" class="chessboard"></div>
+</div>
+<div class="board-controls">
+<button onclick="CC.nav('first')" title="Awal (Home)">⏮</button>
+<button onclick="CC.nav('prev')" title="Mundur (←)">◀</button>
+<button onclick="CC.nav('next')" title="Maju (→)">▶</button>
+<button onclick="CC.nav('last')" title="Akhir (End)">⏭</button>
+<button onclick="CC.flip()" title="Flip (F)">🔄</button>
+<select id="sf-depth" onchange="CC.setDepth(+this.value)" title="Engine Depth">
+<option value="10">Depth 10</option>
+<option value="12">Depth 12</option>
+<option value="14" selected>Depth 14</option>
+<option value="16">Depth 16</option>
+<option value="18">Depth 18</option>
+<option value="20">Depth 20</option>
+</select>
+</div>
+<div id="analysis-progress" style="display:none;width:100%;max-width:460px">
+<div class="loading-bar"><div class="fill" id="progress-fill" style="width:0%"></div></div>
+<div style="font-size:0.75em;color:var(--text3);text-align:center" id="progress-text">Menganalisis...</div>
+</div>
+</div>
+<div class="side-panel">
+<div class="panel-tabs">
+<button class="active" onclick="CC.switchPanel('analysis',this)">💭 Analisis</button>
+<button onclick="CC.switchPanel('critical',this)">🔥 Kritis</button>
+<button onclick="CC.switchPanel('decision',this)">🧠 Keputusan</button>
+</div>
+<div class="panel-content" id="panel-content">
+<div id="p-analysis">
+<div class="empty-state" id="empty-state">
+<div class="es-icon">♟</div>
+<p>Import permainan catur untuk mulai analisis. Gunakan PGN, FEN, atau daftar langkah.</p>
+<button class="btn btn-primary" style="margin-top:14px" onclick="CC.showImport()">📥 Import Game</button>
+</div>
+<div id="analysis-detail" style="display:none"></div>
+</div>
+<div id="p-critical" style="display:none"></div>
+<div id="p-decision" style="display:none"></div>
+</div>
+</div>
+</div>
+<div class="move-list-container" id="ml-container" style="display:none">
+<div class="move-list" id="move-list"></div>
+</div>
+</div>
+
+<!-- PROFILE TAB -->
+<div id="tab-profile" class="tab-content">
+<div style="padding:18px;max-width:780px;margin:0 auto;width:100%">
+<h2 style="margin-bottom:14px;font-size:1.15em">👤 Profil Pemain</h2>
+<div id="profile-content"></div>
+</div>
+</div>
+
+<!-- TRAINING TAB -->
+<div id="tab-training" class="tab-content">
+<div style="padding:18px;max-width:780px;margin:0 auto;width:100%">
+<h2 style="margin-bottom:14px;font-size:1.15em">🎯 Rekomendasi Latihan</h2>
+<div id="training-content"></div>
+</div>
+</div>
+
+<!-- MISTAKES TAB -->
+<div id="tab-mistakes" class="tab-content">
+<div style="padding:18px;max-width:780px;margin:0 auto;width:100%">
+<h2 style="margin-bottom:14px;font-size:1.15em">📚 Database Mistake</h2>
+<div id="mistakes-content"></div>
+</div>
+</div>
+</main>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="m-import">
+<div class="modal">
+<button class="close-btn" onclick="CC.closeModal('m-import')">&times;</button>
+<h2>📥 Import Permainan</h2>
+<div class="form-group">
+<label>Format Input</label>
+<select id="imp-fmt" onchange="CC.updatePlaceholder()">
+<option value="pgn">PGN</option>
+<option value="fen">FEN (posisi saja)</option>
+<option value="moves">Daftar Langkah (SAN)</option>
+</select>
+</div>
+<div class="form-group">
+<label id="imp-label">Paste PGN di sini</label>
+<textarea id="imp-input" placeholder='[Event "Casual Game"]&#10;[White "Player1"]&#10;[Black "Player2"]&#10;&#10;1. e4 e5 2. Nf3 Nc6 3. Bb5 a6...'></textarea>
+</div>
+<div class="form-group">
+<label>Warna Kamu</label>
+<select id="imp-color">
+<option value="auto">Auto-detect</option>
+<option value="white">Putih</option>
+<option value="black">Hitam</option>
+</select>
+</div>
+<div class="btn-group">
+<button class="btn btn-primary" onclick="CC.importGame()">🔍 Import & Analisis</button>
+<button class="btn btn-secondary" onclick="CC.loadSample()">📋 Contoh Game</button>
+<button class="btn btn-secondary" onclick="CC.closeModal('m-import')">Batal</button>
+</div>
+</div>
+</div>
+
+<!-- REPORT MODAL -->
+<div class="modal-overlay" id="m-report">
+<div class="modal" style="max-width:800px">
+<button class="close-btn" onclick="CC.closeModal('m-report')">&times;</button>
+<h2>📊 Laporan Permainan</h2>
+<div id="report-body"></div>
+</div>
+</div>
+
+<!-- SELF-EVAL MODAL -->
+<div class="modal-overlay" id="m-selfeval">
+<div class="modal" style="max-width:560px">
+<button class="close-btn" onclick="CC.closeModal('m-selfeval')">&times;</button>
+<div id="selfeval-body"></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+// ================================================================
+//  CHESSCOACH — Personal Chess Analysis & Coaching Tool
+//  SEE → THINK → CALCULATE → DECIDE → REVIEW → IMPROVE
+// ================================================================
+
+const CC = {
+    // ── STATE ──
+    game: null, positions: [], moves: [], headers: {},
+    curIdx: 0, flipped: false, playerColor: 'white',
+    evals: {}, classifications: {}, criticals: [],
+    depth: 14, sf: null, sfReady: false, engineType: 'basic',
+    analyzing: false, selectedSq: null, legalMoves: [],
+    profile: null, mistakes: [],
+
+    // ── CONSTANTS ──
+    PIECES: {K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'},
+    PNAMES: {p:'Pion',n:'Kuda',b:'Gajah',r:'Benteng',q:'Menteri',k:'Raja'},
+    PVAL: {p:100,n:320,b:330,r:500,q:900,k:20000},
+
+    // Piece-Square Tables (white perspective, a8=index 0)
+    PST:{
+        p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+        n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+        b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+        r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+        q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+        k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
+    },
+
+    // ================================================================
+    //  INIT
+    // ================================================================
+    init() {
+        this.loadProfile();
+        this.initStockfish();
+        this.renderBoard('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+        this.renderProfile();
+        this.renderTraining();
+        this.renderMistakes();
+    },
+
+    // ================================================================
+    //  STOCKFISH ENGINE
+    // ================================================================
+    initStockfish() {
+        try {
+            this.sf = new Worker('https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js');
+            this.sf.onmessage = e => this.handleSF(e.data);
+            this.sf.postMessage('uci');
+            setTimeout(() => {
+                if (!this.sfReady) { this.engineType='basic'; this.updateEngineUI(); }
+            }, 6000);
+        } catch(e) {
+            this.engineType='basic'; this.updateEngineUI();
+        }
+    },
+
+    handleSF(msg) {
+        if (msg==='uciok') { this.sf.postMessage('isready'); }
+        else if (msg==='readyok') {
+            this.sfReady=true; this.engineType='stockfish'; this.updateEngineUI();
+            if (this.positions.length>0 && !this.analyzing) this.analyzeAll();
+        }
+        else if (msg.startsWith('info') && msg.includes('score')) {
+            if (!this._ca) return;
+            const mpv = msg.match(/multipv (\d+)/);
+            if (mpv && mpv[1]!=='1') return;
+            const d = msg.match(/depth (\d+)/);
+            const cp = msg.match(/score cp (-?\d+)/);
+            const mt = msg.match(/score mate (-?\d+)/);
+            const pv = msg.match(/pv (.+)/);
+            if (mt) { this._ca.mate=+mt[1]; this._ca.eval=mt[1]>0?10000:-10000; }
+            else if (cp) { this._ca.eval=+cp[1]; }
+            if (pv) this._ca.pv=pv[1].split(' ');
+            if (d) this._ca.depth=+d[1];
+        }
+        else if (msg.startsWith('bestmove')) {
+            if (this._ca) {
+                this._ca.bestMove=msg.split(' ')[1];
+                this._ca.done=true;
+                if (this._caRes) this._caRes(this._ca);
+            }
+        }
+    },
+
+    evalPos(fen, depth) {
+        depth = depth || this.depth;
+        return new Promise(resolve => {
+            if (this.sfReady && this.sf) {
+                this._ca = {fen, eval:0, depth:0, done:false};
+                this._caRes = resolve;
+                this.sf.postMessage('position fen '+fen);
+                this.sf.postMessage('go depth '+depth);
+                setTimeout(() => { if(this._ca&&!this._ca.done){this._ca.done=true;resolve(this._ca);} }, 12000);
+            } else {
+                resolve(this.basicEval(fen));
+            }
+        });
+    },
+
+    basicEval(fen) {
+        const g = new Chess(fen);
+        const b = g.board();
+        let mat=0, pos=0;
+        for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+            const p=b[r][c]; if(!p) continue;
+            const v=this.PVAL[p.type], pst=this.PST[p.type], idx=r*8+c;
+            if(p.color==='w'){mat+=v;if(pst)pos+=pst[idx];}
+            else{mat-=v;if(pst)pos-=pst[63-idx];}
+        }
+        const mob=(g.moves().length)*(g.turn()==='w'?2:-2);
+        const ev=(mat+pos+mob)/100;
+        // Get a pseudo-best move
+        const moves = g.moves({verbose:true});
+        let bestMove = null;
+        if (moves.length > 0) {
+            // Simple: pick the move that leads to best eval
+            let bestScore = -Infinity;
+            for (const m of moves) {
+                g.move(m.san);
+                let score = 0;
+                const nb = g.board();
+                for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+                    const p=nb[r][c]; if(!p) continue;
+                    const v=this.PVAL[p.type];
+                    if(p.color==='w') score+=v; else score-=v;
+                }
+                if (g.turn()==='b') score = -score; // perspective
+                g.undo();
+                const perspective = fen.split(' ')[1]==='w' ? 1 : -1;
+                if (score * perspective > bestScore) {
+                    bestScore = score * perspective;
+                    bestMove = m.from + m.to + (m.promotion||'');
+                }
+            }
+        }
+        return {fen, eval:Math.round(ev*100)/100, depth:0, done:true, bestMove, pv:[], mate:null};
+    },
+
+    updateEngineUI() {
+        const el=document.getElementById('engine-status');
+        if(this.engineType==='stockfish'){
+            el.className='engine-status online';
+            el.innerHTML='<div class="dot"></div><span>Stockfish</span>';
+        } else {
+            el.className='engine-status offline';
+            el.innerHTML='<div class="dot"></div><span>Basic Eval</span>';
+        }
+    },
+
+    // ================================================================
+    //  IMPORT
+    // ================================================================
+    showImport() { document.getElementById('m-import').classList.add('active'); this.updatePlaceholder(); },
+
+    updatePlaceholder() {
+        const f=document.getElementById('imp-fmt').value;
+        const t=document.getElementById('imp-input');
+        const l=document.getElementById('imp-label');
+        if(f==='pgn'){l.textContent='Paste PGN di sini';t.placeholder='[Event "Casual"]\n[White "Player1"]\n[Black "Player2"]\n\n1. e4 e5 2. Nf3 Nc6...';}
+        else if(f==='fen'){l.textContent='Masukkan FEN';t.placeholder='rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';}
+        else{l.textContent='Daftar langkah (SAN)';t.placeholder='e4 e5 Nf3 Nc6 Bb5 a6...';}
+    },
+
+    importGame() {
+        const fmt=document.getElementById('imp-fmt').value;
+        const input=document.getElementById('imp-input').value.trim();
+        const cp=document.getElementById('imp-color').value;
+        if(!input){alert('Masukkan data permainan!');return;}
+        try {
+            this.game=new Chess(); this.headers={}; this.positions=[]; this.moves=[];
+            this.evals={}; this.classifications={}; this.criticals=[];
+            if(fmt==='pgn') this.loadPGN(input);
+            else if(fmt==='fen') this.loadFEN(input);
+            else this.loadMoves(input);
+            this.playerColor = cp==='auto'?'white':cp;
+            this.closeModal('m-import');
+            this.curIdx=0;
+            this.startAnalysis();
+        } catch(e) { alert('Error: '+e.message); console.error(e); }
+    },
+
+    loadPGN(pgn) {
+        if(!this.game.load_pgn(pgn)) throw new Error('PGN tidak valid.');
+        const hm=pgn.match(/\[(\w+)\s+"([^"]*)"\]/g);
+        if(hm) hm.forEach(h=>{const m=h.match(/\[(\w+)\s+"([^"]*)"\]/);if(m)this.headers[m[1]]=m[2];});
+        const tg=new Chess(); this.positions.push(tg.fen());
+        const hist=this.game.history({verbose:true}); this.moves=hist;
+        hist.forEach(mv=>{tg.move(mv.san);this.positions.push(tg.fen());});
+    },
+
+    loadFEN(fen) {
+        if(!this.game.load(fen)) throw new Error('FEN tidak valid.');
+        this.positions.push(fen);
+    },
+
+    loadMoves(str) {
+        const arr=str.split(/[\s.]+/).filter(m=>m&&!m.match(/^\d+$/));
+        const tg=new Chess(); this.positions.push(tg.fen());
+        this.moves=[];
+        for(const san of arr){
+            const mv=tg.move(san);
+            if(!mv) throw new Error('Langkah tidak valid: '+san);
+            this.moves.push(mv); this.positions.push(tg.fen());
+        }
+    },
+
+    loadSample() {
+        document.getElementById('imp-input').value=
+`[Event "Casual Game"]
+[Site "Internet"]
+[Date "2024.01.15"]
+[White "Player1"]
+[Black "Player2"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. Nbd2 Bb7 12. Bc2 Re8 13. Nf1 Bf8 14. Ng3 g6 15. a4 c5 16. d5 c4 17. Bg5 h6 18. Be3 Nc5 19. Qd2 h5 20. Bg5 Be7 21. Nxe5 dxe5 22. d6 Bf8 23. Rad1 Qd7 24. Bxf6 Bxe4 25. Nxe4 Nxe4 26. Rxe4 Qf5 27. Re1 Qxf6 28. d7 Red8 29. Qd5 Qf4 30. Rxe5 Bxe5 31. Qxe5 f6 32. Qe6+ Kg7 33. Qe7+ Kh6 34. Qxf6 Rf8 35. Qh4+ Kg7 36. Qe7+ Kh6 37. Qh4+ Kg7 38. Qxf4 Rxf4 39. Re7+ Kf6 40. Rd1 Rxf2 41. Kxf2 1-0`;
+        document.getElementById('imp-fmt').value='pgn';
+    },
+
+    // ================================================================
+    //  ANALYSIS PIPELINE
+    // ================================================================
+    async startAnalysis() {
+        this.analyzing=true;
+        this.showGameInfo();
+        this.renderBoard();
+        this.renderMoveList();
+        document.getElementById('ml-container').style.display='block';
+        document.getElementById('gi-bar').style.display='flex';
+        document.getElementById('empty-state').style.display='none';
+        document.getElementById('analysis-detail').style.display='block';
+        document.getElementById('analysis-progress').style.display='block';
+
+        for(let i=0;i<this.positions.length;i++){
+            this.evals[i]=await this.evalPos(this.positions[i]);
+            this.updateEvalBar(i);
+            const pct=Math.round((i+1)/this.positions.length*100);
+            document.getElementById('progress-fill').style.width=pct+'%';
+            document.getElementById('progress-text').textContent=`Menganalisis posisi ${i+1}/${this.positions.length}...`;
+        }
+
+        this.classifyMoves();
+        this.detectCriticals();
+        this.renderMoveList();
+        this.showAnalysis(this.curIdx);
+        this.renderCriticals();
+        document.getElementById('analysis-progress').style.display='none';
+        this.saveToProfile();
+        this.analyzing=false;
+    },
+
+    async analyzeAll() {
+        for(let i=0;i<this.positions.length;i++){
+            if(!this.evals[i]) this.evals[i]=await this.evalPos(this.positions[i]);
+        }
+        this.classifyMoves(); this.detectCriticals();
+        this.renderMoveList(); this.showAnalysis(this.curIdx); this.renderCriticals();
+    },
+
+    // ================================================================
+    //  MOVE CLASSIFICATION
+    // ================================================================
+    classifyMoves() {
+        this.classifications={};
+        for(let i=1;i<this.positions.length;i++){
+            const pe=this.evals[i-1], ce=this.evals[i];
+            if(!pe||!ce) continue;
+            const mv=this.moves[i-1]; if(!mv) continue;
+            const isPlayer=(i%2===1&&this.playerColor==='white')||(i%2===0&&this.playerColor==='black');
+            if(!isPlayer){this.classifications[i]={type:'opponent',label:'Langkah Lawan'};continue;}
+
+            const prevPov=this.playerColor==='white'?pe.eval:-pe.eval;
+            const currPov=this.playerColor==='white'?ce.eval:-ce.eval;
+            const diff=currPov-prevPov;
+            const ad=Math.abs(diff);
+
+            let cl;
+            if(diff>=-0.05) cl={type:'excellent',emoji:'🟢',label:'Excellent',score:5};
+            else if(diff>=-0.3) cl={type:'good',emoji:'🟢',label:'Good',score:4};
+            else if(diff>=-0.8) cl={type:'inaccuracy',emoji:'🔵',label:'Inaccuracy',score:3};
+            else if(diff>=-2.0) cl={type:'mistake',emoji:'🟡',label:'Mistake',score:2};
+            else if(diff>=-5.0) cl={type:'blunder',emoji:'🔴',label:'Blunder',score:1};
+            else cl={type:'gamechanging',emoji:'⚫',label:'Blunder Fatal',score:0};
+
+            if(prevPov<-5) cl={type:'good',emoji:'🟢',label:'Good (posisi sudah kalah)',score:4};
+
+            cl.evalDiff=diff; cl.move=mv; cl.moveIndex=i;
+            this.classifications[i]=cl;
+        }
+    },
+
+    // ================================================================
+    //  CRITICAL MOMENT DETECTION
+    // ================================================================
+    detectCriticals() {
+        this.criticals=[];
+        for(let i=1;i<this.positions.length;i++){
+            const pe=this.evals[i-1],ce=this.evals[i];
+            if(!pe||!ce) continue;
+            const ec=Math.abs(ce.eval-pe.eval);
+            const cl=this.classifications[i];
+            const mv=this.moves[i-1];
+            let isCrit=false, reason='';
+
+            if(ec>120){isCrit=true;reason='Perubahan evaluasi signifikan';}
+            if(cl&&(cl.type==='blunder'||cl.type==='gamechanging')){isCrit=true;reason='Blunder — kehilangan materi/posisi besar';}
+            if(mv&&mv.captured){
+                const cv=this.PVAL[mv.captured]||0;
+                if(cv>=300){isCrit=true;reason=`Pertukaran materi (${this.PNAMES[mv.captured]||mv.captured})`;}
+            }
+            if(mv&&(ce.mate||mv.san.includes('#'))){isCrit=true;reason=mv.san.includes('#')?'Skakmat!':'Ancaman skakmat';}
+            if(mv&&mv.san.includes('+')&&ec>50){isCrit=true;reason='Skak dengan dampak signifikan';}
+            if(mv&&mv.san.includes('O-O')&&i<=15){isCrit=true;reason='Keputusan castling di opening';}
+
+            if(isCrit){
+                const mn=Math.ceil(i/2), iw=i%2===1;
+                const ms=mv?`${mn}. ${iw?'':'...'}${mv.san}`:`Move ${i}`;
+                this.criticals.push({mi:i,ms,reason,ec:ce.eval-pe.eval,ct:cl?cl.type:'neutral'});
+            }
+        }
+        this.criticals.sort((a,b)=>Math.abs(b.ec)-Math.abs(a.ec));
+        this.criticals=this.criticals.slice(0,7);
+        this.criticals.sort((a,b)=>a.mi-b.mi);
+    },
+
+    // ================================================================
+    //  BOARD RENDERING
+    // ================================================================
+    renderBoard(fen) {
+        const bd=document.getElementById('board'); bd.innerHTML='';
+        if(!fen && this.positions.length>0) fen=this.positions[this.curIdx];
+        if(!fen) fen='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+        const g=new Chess(fen), bs=g.board(), files='abcdefgh';
+        let lf=null,lt=null;
+        if(this.curIdx>0&&this.moves[this.curIdx-1]){lf=this.moves[this.curIdx-1].from;lt=this.moves[this.curIdx-1].to;}
+        const isCrit=this.criticals.some(c=>c.mi===this.curIdx);
+
+        for(let dr=0;dr<8;dr++) for(let dc=0;dc<8;dc++){
+            const r=this.flipped?7-dr:dr, c=this.flipped?7-dc:dc;
+            const sq=document.createElement('div');
+            const isL=(r+c)%2===0;
+            sq.className=`square ${isL?'light':'dark'}`;
+            const sn=files[c]+(8-r); sq.dataset.sq=sn;
+            if(lf===sn) sq.classList.add('last-from');
+            if(lt===sn) sq.classList.add('last-to');
+            if(this.selectedSq===sn) sq.classList.add('selected');
+            if(isCrit&&lt===sn) sq.classList.add('critical-highlight');
+            if(this.legalMoves.includes(sn)){
+                const p=bs[r][c]; sq.classList.add(p?'legal-capture':'legal-move');
+            }
+            if(dc===0){const co=document.createElement('span');co.className='coord coord-rank';co.textContent=8-r;sq.appendChild(co);}
+            if(dr===7){const co=document.createElement('span');co.className='coord coord-file';co.textContent=files[c];sq.appendChild(co);}
+            const p=bs[r][c];
+            if(p){const pe=document.createElement('span');pe.className='piece';pe.textContent=this.PIECES[p.color==='w'?p.type.toUpperCase():p.type];sq.appendChild(pe);}
+            sq.addEventListener('click',()=>this.clickSq(sn));
+            bd.appendChild(sq);
+        }
+    },
+
+    clickSq(sn) {
+        if(!this.positions.length) return;
+        const g=new Chess(this.positions[this.curIdx]), bs=g.board(), files='abcdefgh';
+        const c=files.indexOf(sn[0]), r=8-+sn[1], p=bs[r][c];
+        if(this.selectedSq){
+            const mv=g.move({from:this.selectedSq,to:sn});
+            if(mv){this.selectedSq=null;this.legalMoves=[];this.renderBoard();}
+            else if(p&&((g.turn()==='w'&&p.color==='w')||(g.turn()==='b'&&p.color==='b'))){
+                this.selectedSq=sn;this.legalMoves=g.moves({square:sn,verbose:true}).map(m=>m.to);this.renderBoard();
+            } else {this.selectedSq=null;this.legalMoves=[];this.renderBoard();}
+        } else if(p){
+            this.selectedSq=sn;this.legalMoves=g.moves({square:sn,verbose:true}).map(m=>m.to);this.renderBoard();
+        }
+    },
+
+    // ================================================================
+    //  NAVIGATION
+    // ================================================================
+    nav(dir) {
+        switch(dir){
+            case'first':this.curIdx=0;break;
+            case'prev':this.curIdx=Math.max(0,this.curIdx-1);break;
+            case'next':this.curIdx=Math.min(this.positions.length-1,this.curIdx+1);break;
+            case'last':this.curIdx=this.positions.length-1;break;
+        }
+        this.selectedSq=null;this.legalMoves=[];
+        this.renderBoard();this.showAnalysis(this.curIdx);this.updateEvalBar(this.curIdx);this.hlMove();
+    },
+
+    jumpTo(i) {
+        this.curIdx=i;this.selectedSq=null;this.legalMoves=[];
+        this.renderBoard();this.showAnalysis(i);this.updateEvalBar(i);this.hlMove();
+    },
+
+    flip() { this.flipped=!this.flipped; this.renderBoard(); },
+    setDepth(v) { this.depth=v; },
+
+    // ================================================================
+    //  EVAL BAR
+    // ================================================================
+    updateEvalBar(i) {
+        const ev=this.evals[i]; if(!ev) return;
+        const v=ev.eval/100, d=v.toFixed(1);
+        const bar=document.getElementById('eval-bar'), lbl=document.getElementById('eval-bar-label');
+        const cl=Math.max(-10,Math.min(10,v));
+        bar.style.height=(50+(cl/10)*50)+'%';
+        lbl.textContent=d;
+        lbl.style.color=v>=0?'#333':'#fff';
+    },
+
+    // ================================================================
+    //  MOVE LIST
+    // ================================================================
+    renderMoveList() {
+        const ml=document.getElementById('move-list'); ml.innerHTML='';
+        for(let i=0;i<this.moves.length;i++){
+            const mv=this.moves[i], mi=i+1, isW=i%2===0;
+            if(isW){const n=document.createElement('span');n.className='move-num';n.textContent=Math.floor(i/2)+1+'.';ml.appendChild(n);}
+            const s=document.createElement('span');
+            s.className='mv'; s.textContent=mv.san; s.dataset.i=mi;
+            const cl=this.classifications[mi];
+            if(cl&&cl.type!=='opponent') s.classList.add(cl.type);
+            if(mi===this.curIdx) s.classList.add('current');
+            s.addEventListener('click',()=>this.jumpTo(mi));
+            ml.appendChild(s);
+        }
+    },
+
+    hlMove() {
+        document.querySelectorAll('.mv').forEach(el=>{
+            el.classList.toggle('current',+el.dataset.i===this.curIdx);
+        });
+        // Scroll into view
+        const cur=document.querySelector('.mv.current');
+        if(cur) cur.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    },
+
+    // ================================================================
+    //  MOVE ANALYSIS DISPLAY
+    // ================================================================
+    showAnalysis(idx) {
+        const ct=document.getElementById('analysis-detail');
+        if(idx===0){
+            ct.innerHTML=`<div class="info-box"><div class="label">📋 Posisi Awal</div><p>Ini posisi awal permainan. Langkah pertama menentukan arah opening. Klik langkah di bawah untuk navigasi, atau gunakan tombol ◀ ▶.</p></div>`;
+            return;
+        }
+        const mv=this.moves[idx-1]; if(!mv){ct.innerHTML='<p>Langkah tidak tersedia.</p>';return;}
+        const ev=this.evals[idx], pe=this.evals[idx-1], cl=this.classifications[idx];
+        const mn=Math.ceil(idx/2), isW=idx%2===1;
+        const ms=`${mn}. ${isW?'':'...'}${mv.san}`;
+        const pn=this.PNAMES[mv.piece]||mv.piece;
+        let h='';
+
+        // Header
+        h+=`<div style="margin-bottom:8px"><strong style="font-size:1.05em">${ms}</strong>`;
+        if(mv.captured) h+=` <span style="color:var(--orange);font-size:0.85em">× ${this.PNAMES[mv.captured]||mv.captured}</span>`;
+        if(mv.san.includes('+')) h+=` <span style="color:var(--red);font-size:0.85em">†</span>`;
+        if(mv.san.includes('#')) h+=` <span style="color:var(--red);font-size:0.85em">✓ Skakmat!</span>`;
+        h+=`</div>`;
+
+        // Classification
+        if(cl){
+            if(cl.type==='opponent'){
+                h+=`<div class="move-class opponent">♟ Langkah Lawan</div>`;
+            } else {
+                h+=`<div class="move-class ${cl.type}">${cl.emoji} ${cl.label}<span style="margin-left:auto;font-size:0.8em;opacity:0.8">${cl.evalDiff>0?'+':''}${cl.evalDiff.toFixed(1)}</span></div>`;
+            }
+        }
+
+        // Eval display
+        if(ev){
+            const v=(ev.eval/100).toFixed(1), pos=ev.eval>=0;
+            h+=`<div class="eval-display">
+                <div class="eval-number" style="color:${pos?'var(--text)':'var(--text2)'}">${pos?'+':''}${v}</div>
+                <div class="eval-bar-mini"><div class="eval-bar-mini-fill" style="width:${Math.min(100,Math.max(0,50+ev.eval/20))}%;background:${pos?'#ddd':'#555'}"></div></div>
+            </div>`;
+        }
+
+        // Generate explanations
+        const expl=this.explain(idx,mv,cl,ev,pe);
+
+        // Main analysis
+        h+=`<div class="info-box"><div class="label">💭 Analisis</div><p>${expl.main}</p></div>`;
+
+        // What missed
+        if(cl&&['inaccuracy','mistake','blunder','gamechanging'].includes(cl.type)){
+            h+=`<div class="info-box warn"><div class="label">🔍 Apa yang Terlewat</div><p>${expl.missed}</p></div>`;
+        }
+
+        // Better move
+        if(cl&&['inaccuracy','mistake','blunder','gamechanging'].includes(cl.type)){
+            h+=`<div class="better-move"><h4>✅ Langkah Lebih Baik</h4><p>${expl.better}</p></div>`;
+        }
+
+        // Why good
+        if(cl&&['excellent','good'].includes(cl.type)){
+            h+=`<div class="info-box good"><div class="label">👍 Kenapa Ini Bagus</div><p>${expl.why}</p></div>`;
+        }
+
+        // Lesson
+        if(cl&&['mistake','blunder','gamechanging'].includes(cl.type)){
+            h+=`<div class="lesson-box"><h4>📖 Pelajaran</h4><p>${expl.lesson}</p></div>`;
+        }
+
+        ct.innerHTML=h;
+
+        // Update decision panel
+        this.showDecision(idx,mv,cl);
+    },
+
+    // ================================================================
+    //  EXPLANATION ENGINE
+    // ================================================================
+    explain(idx,mv,cl,ev,pe) {
+        const r={main:'',missed:'',better:'',lesson:'',why:''};
+        const pn=this.PNAMES[mv.piece]||mv.piece;
+
+        if(!cl||cl.type==='opponent'){
+            r.main=`Lawan memainkan ${pn} ke ${mv.to}. ${this.movePurpose(mv)}.`;
+            return r;
+        }
+
+        switch(cl.type){
+            case'excellent':
+                r.main=`Langkah sangat bagus! ${pn} ke ${mv.to} ${this.moveStrength(mv)}. Evaluasi tetap stabil/membaik.`;
+                r.why=this.whyGood(mv,ev);
+                break;
+            case'good':
+                r.main=`Langkah solid. ${pn} ke ${mv.to} adalah pilihan yang tepat di posisi ini.`;
+                r.why=this.whyGood(mv,ev);
+                break;
+            case'inaccuracy':
+                r.main=`Kurang tepat. ${pn} ke ${mv.to} tidak memanfaatkan potensi penuh posisi. Evaluasi turun ${Math.abs(cl.evalDiff).toFixed(1)} poin.`;
+                r.missed=this.whatMissed(mv,idx);
+                r.better=this.suggestBetter(mv,idx);
+                break;
+            case'mistake':
+                r.main=`Kesalahan. ${pn} ke ${mv.to} melemahkan posisi secara signifikan. Evaluasi turun ${Math.abs(cl.evalDiff).toFixed(1)} poin.`;
+                r.missed=this.whatMissed(mv,idx);
+                r.better=this.suggestBetter(mv,idx);
+                r.lesson=this.genLesson(mv,cl,idx);
+                break;
+            case'blunder':case'gamechanging':
+                r.main=`Blunder! ${pn} ke ${mv.to} adalah kesalahan besar yang mengubah permainan. Evaluasi anjlok ${Math.abs(cl.evalDiff).toFixed(1)} poin.`;
+                r.missed=this.whatMissed(mv,idx);
+                r.better=this.suggestBetter(mv,idx);
+                r.lesson=this.genLesson(mv,cl,idx);
+                break;
+        }
+        return r;
+    },
+
+    movePurpose(mv) {
+        if(mv.captured) return `menangkap ${this.PNAMES[mv.captured]||'buah'}`;
+        if(mv.san.includes('+')) return 'memberikan skak';
+        if(mv.san.includes('O-O')) return 'castling, mengamankan raja';
+        if('de'.includes(mv.to[0])&&mv.piece==='p') return 'merebut pusat';
+        return 'mengembangkan buah';
+    },
+
+    moveStrength(mv) {
+        if(mv.captured) return `memenangkan ${this.PNAMES[mv.captured]||'buah'} dengan tepat`;
+        if(mv.san.includes('+')) return 'memberikan skak yang kuat';
+        if(mv.san.includes('O-O')) return 'tepat waktu melakukan castling';
+        if('de'.includes(mv.to[0])&&+mv.to[1]>=4) return 'menguasai pusat dengan baik';
+        return 'menempatkan buah di kotak aktif';
+    },
+
+    whyGood(mv,ev) {
+        if(mv.captured) return `Kamu menangkap ${this.PNAMES[mv.captured]} dan mempertahankan keunggulan materi. Langkah taktis yang tepat.`;
+        if(mv.san.includes('O-O')) return 'Castling di waktu tepat. Raja aman dan benteng terhubung. Prinsip opening yang baik.';
+        if('de'.includes(mv.to[0])&&mv.piece==='p') return 'Memajukan pion pusat memberikan kontrol ruang dan membuka jalur buah.';
+        if(ev&&Math.abs(ev.eval)>200){const s=ev.eval>0?'Putih':'Hitam';return `Langkah ini mempertahankan keunggulan ${s.toLowerCase()} secara positional.`;}
+        return 'Langkah ini meningkatkan koordinasi buah dan mempertahankan fleksibilitas posisi.';
+    },
+
+    whatMissed(mv,idx) {
+        const pe=this.evals[idx-1]; if(!pe) return 'Perlu analisis lebih dalam.';
+        const g=new Chess(this.positions[idx-1]);
+        const mvs=g.moves({verbose:true});
+        const caps=mvs.filter(m=>m.captured).sort((a,b)=>(this.PVAL[b.captured]||0)-(this.PVAL[a.captured]||0));
+        const checks=mvs.filter(m=>m.san.includes('+'));
+
+        if(mv.captured&&this.PVAL[mv.piece]>(this.PVAL[mv.captured]||0)){
+            return `Kamu menukar ${this.PNAMES[mv.piece]} (nilai ${this.PVAL[mv.piece]/100}) untuk ${this.PNAMES[mv.captured]||'buah'} (nilai ${(this.PVAL[mv.captured]||0)/100}). Pertukaran ini tidak menguntungkan.`;
+        }
+        if(checks.length>0){
+            return `Ada langkah skak ${checks[0].san} yang mungkin memberikan keuntungan taktis. Selalu periksa semua langkah skak sebelum bermain.`;
+        }
+        if(caps.length>0){
+            const bc=caps[0];
+            return `Ada kemungkinan menangkap ${this.PNAMES[bc.captured]||'buah'} di ${bc.to}. Periksa selalu langkah paksa (skak → tangkapan → ancaman) sebelum bermain.`;
+        }
+        return 'Ada langkah yang lebih baik untuk meningkatkan koordinasi buah atau mengontrol kotak penting yang terlewat.';
+    },
+
+    suggestBetter(mv,idx) {
+        const ce=this.evals[idx];
+        if(!ce||!ce.bestMove) return 'Engine tidak menemukan alternatif yang jelas. Coba analisis lebih dalam.';
+        const bm=ce.bestMove, from=bm.substring(0,2), to=bm.substring(2,4);
+        // Try to identify what piece moves
+        const g=new Chess(this.positions[idx-1]);
+        const allMvs=g.moves({verbose:true});
+        const matching=allMvs.find(m=>m.from===from&&m.to===to);
+        if(matching){
+            const pn=this.PNAMES[matching.piece]||matching.piece;
+            return `Langkah terbaik: ${pn} dari ${from} ke ${to} (${matching.san}). Langkah ini lebih baik karena ${this.explainWhyBetter(matching,mv,idx)}.`;
+        }
+        return `Langkah terbaik menurut engine: ${from} → ${to}. Langkah ini mempertahankan keseimbangan posisi atau menciptakan ancaman lebih efektif.`;
+    },
+
+    explainWhyBetter(better,worse,idx) {
+        if(better.captured&&!worse.captured) return 'langkah ini memenangkan materi sementara langkah kamu tidak';
+        if(better.san.includes('+')&&!worse.san.includes('+')) return 'langkah ini memberikan skak yang membatasi pilihan lawan';
+        if('de'.includes(better.to[0])&&better.piece==='p') return 'langkah ini menguasai pusat lebih efektif';
+        if(better.san.includes('O-O')) return 'langkah ini mengamankan raja tepat waktu';
+        return 'langkah ini meningkatkan aktivitas buah dan menciptakan rencana yang lebih jelas';
+    },
+
+    genLesson(mv,cl,idx) {
+        if(mv.captured&&this.PVAL[mv.piece]>(this.PVAL[mv.captured]||0)){
+            return 'Sebelum menangkap, hitung apakah pertukaran menguntungkan. Jangan menangkap hanya karena bisa.';
+        }
+        if(cl.type==='blunder'||cl.type==='gamechanging'){
+            return 'Selalu lakukan "blunder check": Apakah buah saya aman? Ada skak/tangkapan balasan? Saya meninggalkan sesuatu tanpa pertahanan?';
+        }
+        if(Math.abs(cl.evalDiff)>3){
+            return 'Di posisi kompleks, luangkan waktu lebih banyak. Lebih baik lambat tapi tepat daripada cepat tapi salah.';
+        }
+        if(mv.piece==='p'&&'de'.includes(mv.from[0])&&idx<=15){
+            return 'Memajukan pion pusat di opening perlu perhitungan matang. Pastikan tidak melemahkan struktur atau membuka jalur untuk lawan.';
+        }
+        return 'Periksa semua langkah paksa lawan (skak, tangkapan, ancaman) sebelum berkomitmen pada langkah kamu.';
+    },
+
+    // ================================================================
+    //  DECISION ANALYSIS
+    // ================================================================
+    showDecision(idx,mv,cl) {
+        const p=document.getElementById('p-decision');
+        if(!cl||cl.type==='opponent'||idx===0){
+            p.innerHTML='<div class="empty-state"><p>Pilih langkah kamu untuk melihat analisis keputusan.</p></div>';return;
+        }
+        const pn=this.PNAMES[mv.piece]||mv.piece;
+        let intention,reality,blindSpot,dq,rootCause;
+
+        // Infer intention
+        if(mv.captured) intention=`Kamu mungkin mencoba memenangkan materi dengan menangkap ${this.PNAMES[mv.captured]||'buah'}.`;
+        else if('de'.includes(mv.to[0])&&mv.piece==='p') intention='Kamu mungkin mencoba menguasai pusat dan mendapat ruang.';
+        else if(mv.san.includes('O-O')) intention='Kamu ingin mengamankan raja dan mengaktifkan benteng.';
+        else if('bg'.includes(mv.to[0])&&mv.piece==='p') intention='Kamu mungkin mencoba mengembangkan sayap atau mempersiapkan serangan.';
+        else intention=`Kamu mungkin mencoba meningkatkan aktivitas ${pn} atau mempersiapkan rencana positional.`;
+
+        switch(cl.type){
+            case'excellent':case'good':
+                reality='Posisi kamu tetap solid atau membaik setelah langkah ini.';
+                blindSpot='Tidak ada blind spot signifikan — langkah sesuai kebutuhan posisi.';
+                dq='✅ Keputusan baik — berdasarkan evaluasi posisi yang tepat.';
+                rootCause='-';break;
+            case'inaccuracy':
+                reality='Langkah tidak salah taktis, tapi tidak optimal. Posisi sedikit memburuk.';
+                blindSpot='Ada langkah lebih aktif atau tepat secara positional yang terlewat.';
+                dq='⚠️ Reasonable tapi kurang tepat — kamu melihat sebagian posisi tapi tidak semuanya.';
+                rootCause='Perhitungan dangkal atau pemahaman positional kurang.';break;
+            case'mistake':
+                reality=`Langkah ini signifikan melemahkan posisi. Evaluasi turun ${Math.abs(cl.evalDiff).toFixed(1)} poin.`;
+                blindSpot='Ada elemen taktis/positional penting yang tidak diperhitungkan.';
+                dq='❌ Keputusan buruk — ada informasi penting yang terlewat.';
+                rootCause=this.identifyRoot(mv,idx,cl);break;
+            case'blunder':case'gamechanging':
+                reality=`Langkah ini menghancurkan posisi. Evaluasi anjlok ${Math.abs(cl.evalDiff).toFixed(1)} poin.`;
+                blindSpot='Ada ancaman/taktik yang sama sekali tidak terlihat.';
+                dq='❌❌ Keputusan sangat buruk — oversight besar.';
+                rootCause=this.identifyRoot(mv,idx,cl);break;
+        }
+
+        p.innerHTML=`<div class="decision-box"><h4>🧠 Analisis Keputusan</h4>
+            <div class="decision-grid">
+                <div class="decision-item"><div class="dlabel">🎯 Niat (Kemungkinan)</div><div class="dvalue">${intention}</div></div>
+                <div class="decision-item"><div class="dlabel">📊 Realita Positional</div><div class="dvalue">${reality}</div></div>
+                <div class="decision-item"><div class="dlabel">🙈 Blind Spot</div><div class="dvalue">${blindSpot}</div></div>
+                <div class="decision-item"><div class="dlabel">⚖️ Kualitas Keputusan</div><div class="dvalue">${dq}</div></div>
+            </div>
+            <div class="decision-item" style="margin-top:6px"><div class="dlabel">🔍 Akar Masalah</div><div class="dvalue">${rootCause}</div></div>
+        </div>`;
+    },
+
+    identifyRoot(mv,idx,cl) {
+        const c=[];
+        if(mv.captured&&this.PVAL[mv.piece]>(this.PVAL[mv.captured]||0)) c.push('Kalkulasi — pertukaran materi tidak dihitung benar');
+        if(mv.piece==='p'&&'de'.includes(mv.from[0])&&Math.abs(cl.evalDiff)>2) c.push('King safety — memajukan pion tanpa memperhitungkan kelemahan');
+        if(idx<=12) c.push('Opening knowledge — belum memahami rencana tepat di posisi ini');
+        if(Math.abs(cl.evalDiff)>4) c.push('Tactical awareness — ada taktik yang tidak terlihat (fork/pin/skewer/mat)');
+        if(c.length===0) c.push('Attention — langkah dimainkan tanpa pemeriksaan ancaman lawan');
+        return c.join('. ')+'.';
+    },
+
+    // ================================================================
+    //  CRITICAL MOMENTS PANEL
+    // ================================================================
+    renderCriticals() {
+        const p=document.getElementById('p-critical');
+        if(!this.criticals.length){p.innerHTML='<div class="empty-state"><p>Tidak ada momen kritis terdeteksi.</p></div>';return;}
+        let h='<div style="font-size:0.88em;color:var(--text2);margin-bottom:10px">🔥 Momen-momen yang menentukan arah permainan:</div><div class="timeline">';
+        this.criticals.forEach(cm=>{
+            const col=cm.ct==='blunder'||cm.ct==='gamechanging'?'var(--red)':cm.ct==='mistake'?'var(--orange)':cm.ct==='excellent'||cm.ct==='good'?'var(--green)':'var(--blue)';
+            h+=`<div class="tl-item" onclick="CC.jumpTo(${cm.mi})">
+                <div class="tl-badge" style="background:${col}">${cm.ms}</div>
+                <div class="tl-desc">${cm.reason}</div>
+                <div class="tl-eval">${cm.ec>0?'+':''}${(cm.ec/100).toFixed(1)}</div>
+            </div>`;
+        });
+        h+='</div>';
+        p.innerHTML=h;
+    },
+
+    // ================================================================
+    //  GAME INFO
+    // ================================================================
+    showGameInfo() {
+        document.getElementById('gi-bar').style.display='flex';
+        const w=this.headers.White||'Putih', b=this.headers.Black||'Hitam', res=this.headers.Result||'*';
+        document.getElementById('gi-players').textContent=`♔ ${w} vs ${b} ♚`;
+        document.getElementById('gi-result').textContent=`Hasil: ${res}`;
+        document.getElementById('gi-opening').textContent=`Langkah: ${this.moves.length}`;
+        document.getElementById('gi-moves').textContent=this.headers.Date?`📅 ${this.headers.Date}`:'';
+    },
+
+    // ================================================================
+    //  GAME REPORT
+    // ================================================================
+    showReport() {
+        if(!this.moves.length){alert('Import permainan dulu!');return;}
+        document.getElementById('report-body').innerHTML=this.genReport();
+        document.getElementById('m-report').classList.add('active');
+    },
+
+    genReport() {
+        const res=this.headers.Result||'*';
+        const cnt={excellent:0,good:0,inaccuracy:0,mistake:0,blunder:0,gamechanging:0};
+        let tp=0;
+        Object.values(this.classifications).forEach(c=>{if(c.type!=='opponent'&&cnt.hasOwnProperty(c.type)){cnt[c.type]++;tp++;}});
+        const acc=tp>0?((cnt.excellent+cnt.good)/tp*100).toFixed(0):0;
+
+        const won=(res==='1-0'&&this.playerColor==='white')||(res==='0-1'&&this.playerColor==='black');
+        const lost=(res==='1-0'&&this.playerColor==='black')||(res==='0-1'&&this.playerColor==='white');
+
+        let summary;
+        if(won) summary=`Kamu menang! Dari ${tp} langkah, ${cnt.excellent+cnt.good} bagus, ${cnt.mistake+cnt.blunder+cnt.gamechanging} buruk.`;
+        else if(lost) summary=`Kamu kalah. ${cnt.blunder+cnt.gamechanging} blunder kemungkinan besar menyebabkan kekalahan.`;
+        else if(res==='1/2-1/2') summary=`Permainan seri. Akurasi ${acc}%.`;
+        else summary=`Permainan selesai. Akurasi ${acc}% dari ${tp} langkah.`;
+
+        // Top mistakes
+        const msts=Object.entries(this.classifications).filter(([,c])=>['mistake','blunder','gamechanging'].includes(c.type)).sort(([,a],[,b])=>Math.abs(b.evalDiff)-Math.abs(a.evalDiff)).slice(0,3);
+        let mH='';
+        msts.forEach(([i,c])=>{
+            const mv=this.moves[+i-1];
+            const mn=Math.ceil(+i/2),iw=+i%2===1;
+            const ms=mv?`${mn}. ${iw?'':'...'}${mv.san}`:`Move ${i}`;
+            mH+=`<div class="report-item critical"><strong>${c.emoji} ${ms}</strong> — ${c.label} (${c.evalDiff.toFixed(1)})<br><small>${this.whatMissed(mv,+i)}</small></div>`;
+        });
+
+        // Top strengths
+        const strs=Object.entries(this.classifications).filter(([,c])=>['excellent','good'].includes(c.type)).slice(0,3);
+        let sH='';
+        strs.forEach(([i,c])=>{
+            const mv=this.moves[+i-1];
+            const mn=Math.ceil(+i/2),iw=+i%2===1;
+            const ms=mv?`${mn}. ${iw?'':'...'}${mv.san}`:`Move ${i}`;
+            sH+=`<div class="report-item strength"><strong>🟢 ${ms}</strong> — ${c.label}<br><small>${this.whyGood(mv,this.evals[+i])}</small></div>`;
+        });
+
+        // Main weakness
+        let mw;
+        if(cnt.blunder+cnt.gamechanging>cnt.mistake) mw='Tactical awareness — sering mengabaikan taktik yang mengubah permainan.';
+        else if(cnt.mistake>2) mw='Kalkulasi — sering membuat kesalahan yang menunjukkan perhitungan tidak cukup dalam.';
+        else if(cnt.inaccuracy>3) mw='Pemahaman positional — sering melewatkan langkah lebih aktif/tepat.';
+        else mw='Konsistensi — perlu latihan untuk mempertahankan fokus sepanjang permainan.';
+
+        // Main strength
+        let ms2;
+        if(cnt.excellent>cnt.good) ms2='Intuisi positional — sering menemukan langkah sangat tepat.';
+        else if(cnt.good>cnt.inaccuracy) ms2='Solid play — mayoritas langkah bagus dan posisi terjaga.';
+        else if(cnt.excellent+cnt.good>tp*0.5) ms2='Pemahaman dasar baik — lebih dari setengah langkah berkualitas.';
+        else ms2='Potensi — ada langkah bagus yang menunjukkan pemahaman konsep catur.';
+
+        // Root cause
+        let rc;
+        if(cnt.blunder+cnt.gamechanging>=2) rc='Kurang melakukan "blunder check". Kebiasaan memeriksa skak, tangkapan, dan ancaman lawan sebelum berkomitmen akan mengurangi blunder drastis.';
+        else if(cnt.mistake>=3) rc='Kalkulasi tidak cukup dalam. Cenderung berhenti menghitung terlalu cepat dan melewatkan respons terbaik lawan.';
+        else rc='Attention dan konsistensi. Kesalahan kecil terakumulasi. Fokus pada setiap langkah dan periksa ancaman lawan.';
+
+        // Training
+        let tr='';
+        if(cnt.blunder+cnt.gamechanging>=2) tr+=`<div class="report-item training"><strong>🎯 Anti-Blunder</strong><br>Lakukan 15 puzzle taktis/hari fokus fork, pin, skewer. Sebelum langkah, tanya: "Ada skak/tangkapan/ancaman balasan?"</div>`;
+        if(cnt.mistake>=3) tr+=`<div class="report-item training"><strong>🎯 Kalkulasi</strong><br>10 puzzle kalkulasi 3-5 langkah/hari. Hitung SEMUA langkah paksa lawan. Metode: Skak → Tangkapan → Ancaman.</div>`;
+        if(cnt.inaccuracy>=4) tr+=`<div class="report-item training"><strong>🎯 Positional</strong><br>Pelajari permainan master di opening kamu. Fokus rencana middlegame, struktur pion, penempatan buah. 2 game master/minggu.</div>`;
+        if(!tr) tr=`<div class="report-item training"><strong>🎯 Pertahankan Momentum</strong><br>Performa cukup baik! Latihan taktik ringan (10 puzzle/hari), analisis game sendiri sebelum engine.</div>`;
+
+        return `
+            <div class="report-section"><h3>📊 Hasil</h3><div class="report-item"><strong>Hasil:</strong> ${res} | <strong>Langkah:</strong> ${this.moves.length} | <strong>Akurasi:</strong> ${acc}%</div></div>
+            <div class="report-section"><h3>📝 Ringkasan</h3><div class="report-item">${summary}</div>
+            <div class="report-item" style="font-size:0.82em;color:var(--text2)">🟢 Excellent: ${cnt.excellent} | 🟢 Good: ${cnt.good} | 🔵 Inaccuracy: ${cnt.inaccuracy} | 🟡 Mistake: ${cnt.mistake} | 🔴 Blunder: ${cnt.blunder+cnt.gamechanging}</div></div>
+            <div class="report-section"><h3>❌ Top 3 Mistakes</h3>${mH||'<div class="report-item">Tidak ada mistake signifikan!</div>'}</div>
+            <div class="report-section"><h3>✅ Top 3 Strengths</h3>${sH||'<div class="report-item">Game cukup solid.</div>'}</div>
+            <div class="report-section"><h3>🔥 Momen Kritis</h3>${this.criticals.map(c=>`<div class="report-item critical">${c.ms} — ${c.reason}</div>`).join('')}</div>
+            <div class="report-section"><h3>📉 Kelemahan Utama</h3><div class="report-item weakness">${mw}</div></div>
+            <div class="report-section"><h3>📈 Kekuatan Utama</h3><div class="report-item strength">${ms2}</div></div>
+            <div class="report-section"><h3>🔍 Akar Masalah</h3><div class="report-item">${rc}</div></div>
+            <div class="report-section"><h3>🎯 Latihan</h3>${tr}</div>
+        `;
+    },
+
+    // ================================================================
+    //  PLAYER PROFILE
+    // ================================================================
+    loadProfile() {
+        const s=localStorage.getItem('cc_profile');
+        this.profile=s?JSON.parse(s):{games:[],totalGames:0,wins:0,losses:0,draws:0,
+            skills:{tacticalAwareness:50,calculation:50,blunderFreq:50,candidateMoves:50,threatDetection:50,positional:50,kingSafety:50,pieceActivity:50,pawnStructure:50,opening:50,endgame:50,timeMgmt:50,patternRec:50},trends:[]};
+        const sm=localStorage.getItem('cc_mistakes');
+        this.mistakes=sm?JSON.parse(sm):[];
+    },
+
+    saveProfile() {
+        localStorage.setItem('cc_profile',JSON.stringify(this.profile));
+        localStorage.setItem('cc_mistakes',JSON.stringify(this.mistakes));
+    },
+
+    saveToProfile() {
+        const res=this.headers.Result||'*';
+        const cnt={excellent:0,good:0,inaccuracy:0,mistake:0,blunder:0,gamechanging:0};
+        let tp=0;
+        Object.values(this.classifications).forEach(c=>{if(c.type!=='opponent'&&cnt.hasOwnProperty(c.type)){cnt[c.type]++;tp++;}});
+
+        this.profile.totalGames++;
+        if(res==='1-0'){this.playerColor==='white'?this.profile.wins++:this.profile.losses++;}
+        else if(res==='0-1'){this.playerColor==='black'?this.profile.wins++:this.profile.losses++;}
+        else if(res==='1/2-1/2') this.profile.draws++;
+
+        const acc=tp>0?(cnt.excellent+cnt.good)/tp:0.5;
+        const br=tp>0?(cnt.blunder+cnt.gamechanging)/tp:0;
+        const sk=this.profile.skills;
+        sk.tacticalAwareness=this.lerp(sk.tacticalAwareness,(1-br*3)*100,0.1);
+        sk.calculation=this.lerp(sk.calculation,acc*100,0.1);
+        sk.blunderFreq=this.lerp(sk.blunderFreq,(1-br*5)*100,0.1);
+        sk.threatDetection=this.lerp(sk.threatDetection,(1-br*2)*100,0.1);
+        sk.positional=this.lerp(sk.positional,acc*90,0.1);
+        sk.candidateMoves=this.lerp(sk.candidateMoves,(cnt.excellent+cnt.good)/(tp||1)*85,0.1);
+        sk.kingSafety=this.lerp(sk.kingSafety,(1-br*2)*95,0.08);
+        sk.pieceActivity=this.lerp(sk.pieceActivity,acc*88,0.08);
+        sk.patternRec=this.lerp(sk.patternRec,(1-br*2)*90,0.1);
+
+        Object.keys(sk).forEach(k=>{sk[k]=Math.max(0,Math.min(100,Math.round(sk[k])));});
+
+        this.profile.games.push({date:new Date().toISOString(),result:res,moves:this.moves.length,accuracy:Math.round(acc*100),blunders:cnt.blunder+cnt.gamechanging,mistakes:cnt.mistake,excellent:cnt.excellent,good:cnt.good});
+
+        Object.entries(this.classifications).forEach(([i,c])=>{
+            if(['mistake','blunder','gamechanging'].includes(c.type)){
+                const mv=this.moves[+i-1];
+                if(mv) this.mistakes.push({gid:this.profile.totalGames,mi:+i,move:mv.san,fen:this.positions[+i],type:c.type,ed:c.evalDiff,root:this.identifyRoot(mv,+i,c),date:new Date().toISOString()});
+            }
+        });
+
+        this.profile.trends.push({game:this.profile.totalGames,accuracy:Math.round(acc*100),blunders:cnt.blunder+cnt.gamechanging});
+        this.saveProfile();
+    },
+
+    lerp(c,t,f){return c+(t-c)*f;},
+
+    renderProfile() {
+        const el=document.getElementById('profile-content');
+        if(!this.profile||this.profile.totalGames===0){
+            el.innerHTML='<div class="empty-state"><div class="es-icon">👤</div><p>Belum ada data. Analisis permainan untuk membangun profil.</p></div>';return;
+        }
+        const p=this.profile;
+        let h=`<div class="profile-stats">
+            <div class="stat-card"><div class="sv">${p.totalGames}</div><div class="sl">Total Game</div></div>
+            <div class="stat-card"><div class="sv" style="color:var(--green)">${p.wins}</div><div class="sl">Menang</div></div>
+            <div class="stat-card"><div class="sv" style="color:var(--red)">${p.losses}</div><div class="sl">Kalah</div></div>
+            <div class="stat-card"><div class="sv" style="color:var(--text2)">${p.draws}</div><div class="sl">Seri</div></div>
+        </div>`;
+
+        const sn={tacticalAwareness:'Tactical Awareness',calculation:'Kalkulasi',blunderFreq:'Anti-Blunder',candidateMoves:'Candidate Moves',threatDetection:'Deteksi Ancaman',positional:'Positional',kingSafety:'King Safety',pieceActivity:'Piece Activity',pawnStructure:'Pawn Structure',opening:'Opening',endgame:'Endgame',timeMgmt:'Time Management',patternRec:'Pattern Recognition'};
+
+        h+='<h3 style="margin:16px 0 10px;font-size:0.92em">📈 Kemampuan</h3>';
+        Object.entries(p.skills).forEach(([k,v])=>{
+            const col=v>=70?'var(--green)':v>=40?'var(--orange)':'var(--red)';
+            h+=`<div class="skill-bar"><div class="sk-name"><span>${sn[k]||k}</span><span>${v}%</span></div><div class="sk-bar"><div class="sk-fill" style="width:${v}%;background:${col}"></div></div></div>`;
+        });
+
+        if(p.trends.length>0){
+            h+='<h3 style="margin:16px 0 10px;font-size:0.92em">📊 Tren</h3>';
+            p.trends.slice(-10).forEach(t=>{
+                const ac=t.accuracy>=70?'var(--green)':t.accuracy>=40?'var(--orange)':'var(--red)';
+                h+=`<div class="pattern-item"><div class="pi-icon">🎮</div><div class="pi-info"><div class="pi-title">Game #${t.game}</div><div class="pi-desc">Akurasi: ${t.accuracy}% | Blunder: ${t.blunders}</div></div><div style="color:${ac};font-weight:700">${t.accuracy}%</div></div>`;
+            });
+        }
+
+        // Pattern detection
+        if(this.mistakes.length>3){
+            h+='<h3 style="margin:16px 0 10px;font-size:0.92em">🔍 Pola yang Terdeteksi</h3>';
+            const types={};
+            this.mistakes.forEach(m=>{types[m.type]=(types[m.type]||0)+1;});
+            const sorted=Object.entries(types).sort(([,a],[,b])=>b-a);
+            sorted.forEach(([t,c])=>{
+                const em=t==='blunder'?'🔴':t==='gamechanging'?'⚫':'🟡';
+                const lb=t==='blunder'?'Blunder':t==='gamechanging'?'Blunder Fatal':'Mistake';
+                h+=`<div class="pattern-item"><div class="pi-icon">${em}</div><div class="pi-info"><div class="pi-title">${lb}: ${c} kali</div><div class="pi-desc">${c>3?'⚠️ Pola berulang — perlu latihan khusus!':'Perhatikan dan hindari di game berikutnya.'}</div></div></div>`;
+            });
+        }
+
+        el.innerHTML=h;
+    },
+
+    // ================================================================
+    //  TRAINING GENERATOR
+    // ================================================================
+    renderTraining() {
+        const el=document.getElementById('training-content');
+        if(!this.profile||this.profile.totalGames===0){
+            el.innerHTML='<div class="empty-state"><div class="es-icon">🎯</div><p>Mainkan dan analisis beberapa permainan untuk rekomendasi latihan personal.</p></div>';return;
+        }
+        let h='';
+        const sk=this.profile.skills;
+        const sorted=Object.entries(sk).sort(([,a],[,b])=>a-b);
+        const weakest=sorted.slice(0,3);
+
+        const tm={
+            tacticalAwareness:{t:'🎯 Latihan Taktik — Fork & Pin',d:'15 puzzle taktis/hari fokus fork dan pin. Metode "CCT" (Checks, Captures, Threats) untuk periksa semua langkah paksa sebelum bermain.'},
+            calculation:{t:'🧮 Kalkulasi Dalam',d:'10 puzzle kalkulasi 3-5 langkah/hari. Hitung SEMUA respons paksa lawan. Tulis variasi yang dihitung sebelum bermain.'},
+            blunderFreq:{t:'🛡️ Routine Anti-Blunder',d:'Sebelum setiap langkah: (1) Buah saya aman? (2) Ada skak/tangkapan balasan? (3) Meninggalkan sesuatu tanpa pertahanan?'},
+            candidateMoves:{t:'🤔 Candidate Moves',d:'Di setiap posisi, identifikasi minimal 3 candidate moves sebelum menghitung. Proses: "Apa tujuan saya? Langkah mana yang mencapainya?"'},
+            threatDetection:{t:'👁️ Deteksi Ancaman',d:'Setelah langkah lawan, identifikasi: Apa yang diancam? Buah mana tidak aman? Ada taktik tersembunyi? 10 posisi/hari.'},
+            positional:{t:'📐 Studi Positional',d:'Pelajari 2 game master/minggu di opening kamu. Fokus: rencana middlegame, struktur pion, manuver buah.'},
+            kingSafety:{t:'🏰 King Safety',d:'Pelajari pola serangan raja: Greek Gift, serangan pion, baterai menteri+gajah. Pahami kapan castling dan kapan raja aman di pusat.'},
+            pieceActivity:{t:'♟ Aktivitas Buah',d:'Di setiap posisi, identifikasi buah terburuk dan cari cara mengaktifkannya. 10 posisi middlegame/hari.'},
+            pawnStructure:{t:'🏗️ Struktur Pion',d:'Pelajari: isolated pawn, backward pawn, pawn chain, passed pawn. Pahami rencana di setiap struktur.'},
+            opening:{t:'📚 Opening Repertoire',d:'Pilih 2-3 opening dan pelajari rencana middlegame-nya (bukan hafalan). Pahami struktur pion dan rencana khas.'},
+            endgame:{t:'♔ Endgame',d:'Kuasai: King+Pawn vs King, Rook endgame (Lucena & Philidor), prinsip endgame (aktivasi raja, opposition, zugzwang).'},
+            timeMgmt:{t:'⏰ Manajemen Waktu',d:'Budget: opening 10%, middlegame 60%, endgame 30%. Jangan habiskan waktu di posisi dikenal. Luangkan waktu di momen kritis.'},
+            patternRec:{t:'🔄 Pattern Recognition',d:'Pelajari pola: back-rank mate, smothered mate, windmill, x-ray. 20 puzzle pattern/hari.'}
+        };
+
+        h+='<div style="font-size:0.85em;color:var(--text2);margin-bottom:12px">Berdasarkan kelemahan dari semua permainan yang dianalisis:</div>';
+        weakest.forEach(([k,v])=>{
+            const tr=tm[k]; if(!tr) return;
+            h+=`<div class="training-card"><h4>${tr.t} <span style="font-weight:400;font-size:0.8em;color:var(--text3)">(${v}%)</span></h4><p>${tr.d}</p></div>`;
+        });
+
+        if(this.mistakes.length>0){
+            h+='<h3 style="margin:18px 0 10px;font-size:0.92em">🔍 Pola Mistake</h3>';
+            const types={};
+            this.mistakes.forEach(m=>{types[m.type]=(types[m.type]||0)+1;});
+            Object.entries(types).sort(([,a],[,b])=>b-a).forEach(([t,c])=>{
+                const em=t==='blunder'?'🔴':t==='gamechanging'?'⚫':'🟡';
+                const lb=t==='blunder'?'Blunder':t==='gamechanging'?'Blunder Fatal':'Mistake';
+                h+=`<div class="pattern-item"><div class="pi-icon">${em}</div><div class="pi-info"><div class="pi-title">${lb}: ${c} kali</div><div class="pi-desc">${c>3?'Pola berulang — latihan khusus diperlukan!':'Hindari di game berikutnya.'}</div></div></div>`;
+            });
+        }
+
+        el.innerHTML=h;
+    },
+
+    // ================================================================
+    //  MISTAKES DATABASE
+    // ================================================================
+    renderMistakes() {
+        const el=document.getElementById('mistakes-content');
+        if(!this.mistakes.length){el.innerHTML='<div class="empty-state"><div class="es-icon">📚</div><p>Belum ada mistake tercatat. Analisis permainan untuk mulai membangun database.</p></div>';return;}
+
+        let h=`<div style="font-size:0.85em;color:var(--text2);margin-bottom:14px">Total: <strong>${this.mistakes.length}</strong> mistake dari <strong>${this.profile.totalGames}</strong> permainan.</div>`;
+
+        const grouped={};
+        this.mistakes.forEach(m=>{if(!grouped[m.type])grouped[m.type]=[];grouped[m.type].push(m);});
+
+        Object.entries(grouped).sort(([,a],[,b])=>b.length-a.length).forEach(([type,msts])=>{
+            const em=type==='blunder'?'🔴':type==='gamechanging'?'⚫':'🟡';
+            const lb=type==='blunder'?'Blunder':type==='gamechanging'?'Blunder Fatal':'Mistake';
+            h+=`<h3 style="margin:14px 0 6px;font-size:0.88em">${em} ${lb} (${msts.length})</h3>`;
+            msts.slice(-8).reverse().forEach(m=>{
+                h+=`<div class="report-item" style="cursor:pointer" onclick="CC.jumpTo(${m.mi})">
+                    <strong>Game #${m.gid} — ${m.move}</strong><br>
+                    <small style="color:var(--text2)">Evaluasi: ${m.ed.toFixed(1)} | ${m.root}</small>
+                </div>`;
+            });
+        });
+
+        el.innerHTML=h;
+    },
+
+    // ================================================================
+    //  SELF-EVALUATION MODE
+    // ================================================================
+    startSelfEval() {
+        if(!this.criticals.length){alert('Analisis permainan dulu untuk Self-Eval!');return;}
+        const cm=this.criticals[Math.floor(Math.random()*this.criticals.length)];
+        const fen=this.positions[cm.mi-1]||this.positions[0];
+        const am=this.moves[cm.mi-1];
+
+        const bd=document.getElementById('selfeval-body');
+        bd.innerHTML=`<h2>🧠 Self-Evaluation</h2>
+            <p style="color:var(--accent);font-size:1em;margin:10px 0">Di posisi ini (sebelum ${cm.ms}), apa yang kamu mainkan?</p>
+            <div id="se-board" class="self-eval-board"></div>
+            <div class="form-group"><label>Langkah kamu (SAN: Nf3, e4, O-O...):</label><input type="text" id="se-move" placeholder="Masukkan langkah..."></div>
+            <div class="form-group"><label>Kenapa langkah ini?</label><textarea id="se-reason" placeholder="Jelaskan pemikiran kamu..." style="min-height:70px"></textarea></div>
+            <div class="btn-group" style="justify-content:center"><button class="btn btn-primary" onclick="CC.submitSE(${cm.mi})">🔍 Lihat Hasil</button></div>
+            <div id="se-result" style="margin-top:14px"></div>`;
+
+        document.getElementById('m-selfeval').classList.add('active');
+
+        setTimeout(()=>{
+            const sb=document.getElementById('se-board');
+            const g=new Chess(fen), bs=g.board();
+            let seFrom=null;
+            for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+                const sq=document.createElement('div');
+                const isL=(r+c)%2===0;
+                sq.className=`se-sq ${isL?'light':'dark'}`;
+                const p=bs[r][c];
+                if(p) sq.textContent=this.PIECES[p.color==='w'?p.type.toUpperCase():p.type];
+                sq.addEventListener('click',()=>{
+                    document.querySelectorAll('.se-sq').forEach(s=>s.classList.remove('se-selected'));
+                    sq.classList.add('se-selected');
+                    const files='abcdefgh';
+                    const inp=document.getElementById('se-move');
+                    if(seFrom){
+                        inp.value=seFrom+files[c]+(8-r);
+                        seFrom=null;
+                        document.querySelectorAll('.se-sq').forEach(s=>s.classList.remove('se-selected'));
+                    } else {
+                        seFrom=files[c]+(8-r);
+                    }
+                });
+                sb.appendChild(sq);
+            }
+        },100);
+    },
+
+    submitSE(mi) {
+        const um=document.getElementById('se-move').value.trim();
+        const ur=document.getElementById('se-reason').value.trim();
+        const rd=document.getElementById('se-result');
+        if(!um){alert('Masukkan langkah!');return;}
+
+        const fen=this.positions[mi-1]||this.positions[0];
+        const am=this.moves[mi-1];
+        const ev=this.evals[mi], pe=this.evals[mi-1];
+
+        const g=new Chess(fen);
+        const vm=g.move(um);
+        let ue=null;
+        if(vm) ue=this.basicEval(g.fen());
+
+        const aev=ev?(ev.eval/100).toFixed(1):'?';
+        const uev=ue?(ue.eval/100).toFixed(1):'?';
+
+        let comp='';
+        if(vm&&ue&&ev){
+            const d=Math.abs(ue.eval-ev.eval)/100;
+            if(d<0.3) comp='✅ Langkah kamu hampir sama bagusnya dengan langkah terbaik!';
+            else if(d<1) comp='⚠️ Langkah kamu playable tapi ada yang lebih baik.';
+            else comp='❌ Langkah terbaik secara signifikan lebih kuat.';
+        } else if(!vm) comp='❌ Langkah tidak valid di posisi ini.';
+
+        let reasonFb='';
+        if(ur){
+            const rl=ur.toLowerCase();
+            if(rl.includes('serang')||rl.includes('attack')) reasonFb+='Kamu memikirkan serangan — bagus! Pastikan didukung cukup buah. ';
+            if(rl.includes('defend')||rl.includes('pertahan')) reasonFb+='Memperhatikan pertahanan — penting. Pastikan tidak terlalu pasif. ';
+            if(rl.includes('pusat')||rl.includes('center')) reasonFb+='Memperhatikan pusat — prinsip bagus. ';
+            if(rl.includes('raja')||rl.includes('king')) reasonFb+='Memperhatikan keselamatan raja — sangat penting. ';
+            if(!reasonFb) reasonFb='Pastikan reasoning mencakup: (1) Apa yang diancam lawan? (2) Apa rencana saya? (3) Apakah langkah ini aman?';
+        }
+
+        const cl=this.classifications[mi];
+        const expl=cl?this.explain(mi,am,cl,ev,pe):{lesson:'Pelajari posisi ini lebih dalam.'};
+
+        rd.innerHTML=`
+            <div class="info-box good"><div class="label">📊 Hasil Self-Eval</div>
+                <p><strong>Langkah kamu:</strong> ${um} ${vm?'(valid)':'(tidak valid)'}</p>
+                <p><strong>Langkah aktual:</strong> ${am?am.san:'?'}</p>
+                <p><strong>Evaluasi aktual:</strong> ${aev}</p>
+                ${ue?`<p><strong>Evaluasi kamu:</strong> ${uev}</p>`:''}
+                <p style="margin-top:6px">${comp}</p>
+            </div>
+            ${ur?`<div class="info-box info"><div class="label">🧠 Reasoning Kamu</div><p>"${ur}"</p><p style="margin-top:6px;font-size:0.85em;color:var(--text2)">${reasonFb}</p></div>`:''}
+            <div class="lesson-box"><h4>📖 Pelajaran</h4><p>${expl.lesson||'Pelajari posisi ini lebih dalam untuk memahami rencana tepat.'}</p></div>
+        `;
+    },
+
+    // ================================================================
+    //  UI HELPERS
+    // ================================================================
+    switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+        document.querySelectorAll('nav button').forEach(el=>el.classList.remove('active'));
+        document.getElementById('tab-'+tab).classList.add('active');
+        document.querySelector(`nav button[data-tab="${tab}"]`).classList.add('active');
+        if(tab==='profile') this.renderProfile();
+        if(tab==='training') this.renderTraining();
+        if(tab==='mistakes') this.renderMistakes();
+    },
+
+    switchPanel(panel,btn) {
+        document.querySelectorAll('.panel-tabs button').forEach(b=>b.classList.remove('active'));
+        document.getElementById('p-analysis').style.display='none';
+        document.getElementById('p-critical').style.display='none';
+        document.getElementById('p-decision').style.display='none';
+        document.getElementById('p-'+panel).style.display='block';
+        btn.classList.add('active');
+    },
+
+    closeModal(id) { document.getElementById(id).classList.remove('active'); },
+
+    resetAll() {
+        if(!confirm('Reset semua data? Profil, mistake database, dan game saat ini akan dihapus.')) return;
+        localStorage.removeItem('cc_profile');
+        localStorage.removeItem('cc_mistakes');
+        this.profile=null;this.mistakes=[];this.game=null;this.positions=[];this.moves=[];
+        this.evals={};this.classifications={};this.criticals=[];this.curIdx=0;
+        this.loadProfile();
+        document.getElementById('gi-bar').style.display='none';
+        document.getElementById('ml-container').style.display='none';
+        document.getElementById('empty-state').style.display='flex';
+        document.getElementById('analysis-detail').style.display='none';
+        document.getElementById('p-critical').innerHTML='';
+        document.getElementById('p-decision').innerHTML='';
+        this.renderBoard('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+        this.renderProfile();this.renderTraining();this.renderMistakes();
+    },
+
+    handleKey(e) {
+        if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+        switch(e.key){
+            case'ArrowLeft':this.nav('prev');e.preventDefault();break;
+            case'ArrowRight':this.nav('next');e.preventDefault();break;
+            case'Home':this.nav('first');e.preventDefault();break;
+            case'End':this.nav('last');e.preventDefault();break;
+            case'f':case'F':this.flip();break;
+        }
+    }
+};
+
+document.addEventListener('DOMContentLoaded',()=>CC.init());
+document.addEventListener('keydown',e=>CC.handleKey(e));
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+    o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');});
+});
+</script>
+</body>
+</html>
